@@ -3,99 +3,49 @@ import pandas as pd
 import numpy as np
 import joblib
 
-# Configuración básica de la página
-st.set_page_config(
-    page_title="Evaluación de Riesgo Crediticio",
-    page_icon="💳",
-    layout="centered"
-)
+# Configuración de la página
+st.set_page_config(page_title="Evaluador de Credit Scoring (Sin Pipeline)", page_icon="💳", layout="centered")
 
-# Cargar el pipeline entrenado
+# Cargar los componentes independientes guardados previamente
 @st.cache_resource
-def cargar_pipeline():
-    return joblib.load("pipeline_credit_scoring.joblib")
+def cargar_componentes():
+    modelo = joblib.load("modelo_logistico.joblib")
+    imputer_num = joblib.load("imputer_num.joblib")
+    scaler = joblib.load("scaler.joblib")
+    imputer_cat = joblib.load("imputer_cat.joblib")
+    encoder = joblib.load("encoder.joblib")
+    return modelo, imputer_num, scaler, imputer_cat, encoder
 
-try:
-    pipeline = cargar_pipeline()
-except Exception as e:
-    st.error(f"Error al cargar el archivo 'pipeline_credit_scoring.joblib': {e}")
-    st.stop()
+modelo, imputer_num, scaler, imputer_cat, encoder = cargar_componentes()
 
-st.title("💳 Evaluación de Solicitud de Crédito")
-st.write(
-    "Ingresa los datos del solicitante para estimar la probabilidad de riesgo "
-    "y conocer el estado de aprobación."
-)
+cuantitativas = ["person_age", "person_income", "person_emp_length", "loan_amnt"]
+cualitativas = ["person_home_ownership", "loan_intent"]
 
-st.markdown("---")
+st.title("💳 Evaluador de Credit Scoring")
+st.write("Ingrese los datos del solicitante. La transformación se realiza con componentes independientes (sin pipeline).")
 
-# Formulario de entrada de datos
-with st.form("formulario_credito"):
+# Formulario de entrada
+with st.form("form_solicitante"):
     st.subheader("Datos del Solicitante")
     
     col1, col2 = st.columns(2)
-    
     with col1:
-        edad = st.number_input(
-            "Edad (años):",
-            min_value=18,
-            max_value=100,
-            value=30,
-            step=1
-        )
-        
-        ingreso = st.number_input(
-            "Ingreso anual ($):",
-            min_value=1.0,
-            max_value=2000000.0,
-            value=45000.0,
-            step=1000.0
-        )
-        
-        tiene_antiguedad = st.checkbox("¿Especificar antigüedad laboral?", value=True)
-        if tiene_antiguedad:
-            antiguedad = st.number_input(
-                "Antigüedad laboral (años):",
-                min_value=0.0,
-                max_value=float(edad - 14),
-                value=4.0,
-                step=0.5
-            )
-        else:
-            antiguedad = np.nan  # El pipeline imputará automáticamente la mediana
-            
+        edad = st.number_input("Edad (años)", min_value=18, max_value=100, value=35)
+        ingreso = st.number_input("Ingreso anual", min_value=0.0, value=65000.0, step=1000.0)
     with col2:
-        monto_prestamo = st.number_input(
-            "Monto del préstamo solicitado ($):",
-            min_value=100.0,
-            max_value=100000.0,
-            value=8000.0,
-            step=500.0
-        )
-        
-        vivienda = st.selectbox(
-            "Tipo de vivienda:",
-            options=["RENT", "MORTGAGE", "OWN", "OTHER"]
-        )
-        
-        finalidad = st.selectbox(
-            "Finalidad del préstamo:",
-            options=[
-                "EDUCATION",
-                "MEDICAL",
-                "VENTURE",
-                "PERSONAL",
-                "DEBTCONSOLIDATION",
-                "HOMEIMPROVEMENT"
-            ]
-        )
-
+        antiguedad = st.number_input("Antigüedad laboral (años)", min_value=0.0, max_value=80.0, value=8.0)
+        monto_prestamo = st.number_input("Monto del préstamo", min_value=0.0, value=8000.0, step=500.0)
+    
+    st.subheader("Detalles del Crédito y Vivienda")
+    vivienda = st.selectbox("Tipo de vivienda", ["RENT", "MORTGAGE", "OWN", "OTHER"])
+    finalidad = st.selectbox("Finalidad del préstamo", ["EDUCATION", "MEDICAL", "VENTURE", "PERSONAL", "HOMEIMPROVEMENT", "DEBTCONSOLIDATION"])
+    
     boton_evaluar = st.form_submit_button("Evaluar Solicitud")
 
-# Evaluación al enviar el formulario
+# Realizar predicción al enviar el formulario
 if boton_evaluar:
-    # Construcción del DataFrame con las mismas columnas del pipeline
-    solicitud = pd.DataFrame([{
+    # 1. Crear el DataFrame con el nuevo cliente
+    cliente = pd.DataFrame([{
         "person_age": edad,
         "person_income": ingreso,
         "person_emp_length": antiguedad,
@@ -104,24 +54,26 @@ if boton_evaluar:
         "loan_intent": finalidad
     }])
     
-    # Estimación de la probabilidad de incumplimiento (clase 1)
-    prob_incumplimiento = pipeline.predict_proba(solicitud)[0, 1]
-    prob_porcentaje = prob_incumplimiento * 100
-
-    st.markdown("---")
+    # 2. Aplicar la transformación paso a paso (sin pipeline)
+    num_procesado = scaler.transform(imputer_num.transform(cliente[cuantitativas]))
+    cat_procesado = encoder.transform(imputer_cat.transform(cliente[cualitativas]))
+    
+    # Unir las matrices transformadas
+    X_cliente = np.hstack([num_procesado, cat_procesado])
+    
+    # 3. Predecir con el modelo de clasificación directo
+    probabilidad = modelo.predict_proba(X_cliente)[0, 1]
+    clase = modelo.predict(X_cliente)[0]
+    
+    st.divider()
     st.subheader("Resultado de la Evaluación")
     
-    col_m1, col_m2 = st.columns(2)
-    col_m1.metric("Probabilidad de Incumplimiento", f"{prob_porcentaje:.2f}%")
+    col_res1, col_res2 = st.columns(2)
+    with col_res1:
+        st.metric(label="Probabilidad de Incumplimiento", value=f"{probabilidad:.2%}")
     
-    # Condición solicitada: menor al 20%
-    if prob_porcentaje < 20.0:
-        st.balloons()
-        st.success("🎉 ¡Felicidades! Tu solicitud de crédito ha sido **Pre-Aprobada**.")
-        st.info("El nivel de riesgo se encuentra en un rango óptimo (menor al 20%).")
-    else:
-        st.warning("⚠️ Solicitud pendiente de revisión manual.")
-        st.write(
-            "El nivel de riesgo supera el umbral del 20% para aprobación automática. "
-            "Se requiere un análisis adicional por parte del equipo de riesgos."
-        )
+    with col_res2:
+        if clase == 1:
+            st.error("⚠️ **Riesgo Alto:** Se predice incumplimiento.")
+        else:
+            st.success("✅ **Riesgo Bajo:** No se predice incumplimiento.")
