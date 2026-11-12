@@ -1,0 +1,36 @@
+{
+  "python": "3.12.14",
+  "dependencias": {
+    "joblib": "1.5.3",
+    "numpy": "2.3.5",
+    "pandas": "2.2.3",
+    "scikit-learn": "1.8.0",
+    "scipy": "1.17.0",
+    "threadpoolctl": "3.6.0"
+  },
+  "dataset": {
+    "url": "https://raw.githubusercontent.com/SergioDP94/CreditScoring/a47b8d31daf61fc722ce59576165606fced3c914/Data/credit_risk_dataset.csv",
+    "commit": "a47b8d31daf61fc722ce59576165606fced3c914",
+    "sha256": "ce3c6d2167717bf1627d1c0c81cbccd28323cd4aa7b96d542599366d5ff6aac8"
+  },
+  "variables": [
+    "person_age",
+    "person_income",
+    "person_emp_length",
+    "loan_amnt",
+    "person_home_ownership",
+    "loan_intent"
+  ],
+  "objetivo": "loan_status",
+  "clase_incumplimiento": 1,
+  "semilla": 42,
+  "proporcion_prueba": 0.2,
+  "filas": {
+    "entrenamiento": 25928,
+    "prueba": 6483
+  },
+  "metricas_prueba": {
+    "roc_auc": 0.7803094329429685,
+    "recall_incumplimiento": 0.2863187588152327
+  }
+}

@@ -1,0 +1,18 @@
+[
+  {
+    "person_age": 35,
+    "person_income": 65000,
+    "person_emp_length": 8,
+    "loan_amnt": 8000,
+    "person_home_ownership": "MORTGAGE",
+    "loan_intent": "EDUCATION"
+  },
+  {
+    "person_age": 23,
+    "person_income": 18000,
+    "person_emp_length": null,
+    "loan_amnt": 14000,
+    "person_home_ownership": "RENT",
+    "loan_intent": "MEDICAL"
+  }
+]
